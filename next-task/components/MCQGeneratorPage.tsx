@@ -91,22 +91,22 @@ const MCQGeneratorPage = () => {
 
         try {
             // Specify the expected response data type with axios
-            const response = await axios.post<MCQ[]>(endpoint.generateMcqs, formData, {
+            const response:any = await axios.post<MCQ[]>(endpoint.generateMcqs, formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
                 },
             });
-
-            let user = response.data[0];
+            
+            let candidate_details:any = response.data.candidate_details;
             setUserDetails({
-                name:user?.candidate_name,
-                email: user.email,
-                phone: user.phone
+                name:candidate_details?.name,
+                email: candidate_details?.email,
+                phone: candidate_details?.phone,
+                total_experience: candidate_details?.total_experience
 
             })
-            response.data.shift();
             
-            setMcqs(response.data);
+            setMcqs(response.data.questions);
         } catch (err) {
             setError('Failed to generate MCQs. The model might be busy. Please try again.');
             console.error(err);

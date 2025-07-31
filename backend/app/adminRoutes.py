@@ -212,7 +212,8 @@ def extract_text_from_docx(file_stream):
 def generate_mcqs():
     # Configure the Gemini API
     genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-1.5-flash-latest')
+    # model = genai.GenerativeModel('gemini-1.5-flash-latest')
+    model = genai.GenerativeModel('gemini-2.5-flash')
     
     if 'resume' not in request.files:
         return jsonify({"error": "No resume file provided"}), 400
@@ -232,49 +233,109 @@ def generate_mcqs():
         return jsonify({"error": "Missing resume content or job description"}), 400
     
     # --- AI Prompt Engineering ---
-    prompt = f"""
-    As an expert AI hiring assistant, your task is to generate 10 to 15 interview-style multiple-choice questions (MCQs).
-    Analyze the provided job description and the candidate's resume.
-    Identify the key skills and requirements in the job description that are either MISSING or WEAKLY represented in the candidate's resume.
-    The questions should be designed to test the candidate's knowledge and job description on these specific gap areas. Also take candidate's name, phone number and email
+    # prompt = f"""
+    # As an expert AI hiring assistant, your task is to generate 10 to 15 interview-style multiple-choice questions (MCQs).
+    # Analyze the provided job description and the candidate's resume.
+    # Identify the key skills and requirements in the job description that are either MISSING or WEAKLY represented in the candidate's resume.
+    # The questions should be designed to test the candidate's knowledge and job description on these specific gap areas. Also take candidate's name, phone number, total experience and email
 
-    **Job Description:**
+    # **Job Description:**
+    # ---
+    # {job_description}
+    # ---
+
+    # **Candidate's Resume:**
+    # ---
+    # {resume_text}
+    # ---
+
+    # **Instructions:**
+    # 1.  Generate 10 technical or situational MCQs.
+    # 2.  For each question, provide 4 options (A, B, C, D).
+    # 3.  Indicate the correct answer.
+    # 4.  Provide a brief explanation for why the correct answer is right.
+    # 5.  Take candidate name, email, phone number from Resume and attach json resonse.
+    # 6.  Return the output ONLY as a valid JSON array of objects. Do not include any other text or markdown formatting before or after the JSON.
+
+    # **JSON Output Format Example:**
+    # [ 
+    #     {{
+    #         "candidate_name": "John Doe",
+    #         "email": "john.doe@example.com",
+    #         "phone": "1234567890",
+    #         "total_experience":
+    #     }},
+    #   {{
+    #         "question": "What is the primary advantage of using a microservices architecture?",
+    #         "options": {{
+    #         "A": "Simplified deployment process",
+    #         "B": "Reduced network latency",
+    #         "C": "Increased fault tolerance and scalability",
+    #         "D": "Lower development costs"
+    #         }},
+    #         "correct_answer": "C",
+    #         "explanation": "Microservices allow individual services to be scaled and deployed independently, increasing the overall system's fault tolerance and scalability."
+    #    }}
+    # ]
+    # """
+
+    # Replace the old prompt variable with this new one
+
+    prompt = f"""
+    As an expert AI hiring assistant, your task is to generate 15 interview-style multiple-choice questions (MCQs).
+
+    **Step 1: Analyze the Candidate**
+    First, read the candidate's resume to determine the following:
+    - Candidate's full name.
+    - Candidate's email address.s
+    - Candidate's phone number.
+    - Total years of professional experience.
+    - Experience Level: Classify the candidate as 'Beginner' (0-2 years), 'Medium' (2-4 years), or 'Senior ' (4+ years).
+
+    **Step 2: Analyze the Skill Gap**
+    Next, compare the resume against the job description. Identify key skills, technologies, or responsibilities mentioned in the job description that are either MISSING or WEAKLY represented in the resume.
+
+    **Step 3: Generate Questions**
+    Based on the skill gaps and the candidate's Experience Level identified in Step 1, generate 15 to 20 multiple-choice questions (MCQs).
+    - For 'Beginner' level, ask fundamental, coding question, definition-based questions.
+    - For 'Medium' level, ask practical application, coding question, system designer and scenario-based questions.
+    - For 'Senior ' level, ask complex, strategic, coding question, system designer and architectural questions.
+
+    **Context:**
     ---
+    **Job Description:**
     {job_description}
     ---
-
     **Candidate's Resume:**
-    ---
     {resume_text}
     ---
 
-    **Instructions:**
-    1.  Generate 10 technical or situational MCQs.
-    2.  For each question, provide 4 options (A, B, C, D).
-    3.  Indicate the correct answer.
-    4.  Provide a brief explanation for why the correct answer is right.
-    5.  Take candidate name, email, phone number from Resume and attach json resonse.
-    6.  Return the output ONLY as a valid JSON array of objects. Do not include any other text or markdown formatting before or after the JSON.
+    **Output Instructions:**
+    Return a single, valid JSON object. Do NOT include any other text or markdown formatting (like ```json). The JSON object must contain the candidate's details and a list of the generated questions.
 
     **JSON Output Format Example:**
-    [ 
+    {{
+    "candidate_details": {{
+        "name": "Priya Sharma",
+        "email": "priya.sharma@example.com",
+        "phone": "9876543210",
+        "total_experience": "4 years",
+        "experience_level": "Senior"
+    }},
+    "questions": [
         {{
-            "candidate_name": "John Doe",
-            "email": "john.doe@example.com",
-            "phone": "1234567890"
+        "question": "In a microservices architecture, what is the primary role of an API Gateway?",
+        "options": {{
+            "A": "To directly handle business logic for each service",
+            "B": "To act as a single entry point, handling routing, authentication, and rate limiting",
+            "C": "To store and manage data for all microservices",
+            "D": "To replace the need for service discovery"
         }},
-      {{
-            "question": "What is the primary advantage of using a microservices architecture?",
-            "options": {{
-            "A": "Simplified deployment process",
-            "B": "Reduced network latency",
-            "C": "Increased fault tolerance and scalability",
-            "D": "Lower development costs"
-            }},
-            "correct_answer": "C",
-            "explanation": "Microservices allow individual services to be scaled and deployed independently, increasing the overall system's fault tolerance and scalability."
-       }}
+        "correct_answer": "B",
+        "explanation": "An API Gateway is a crucial component that abstracts the backend services and provides a unified, secure interface for clients."
+        }}
     ]
+    }}
     """
 
     try:
@@ -298,22 +359,13 @@ def save_results():
         # --- Database Logic Placeholder ---
         # In a real application, you would use something like SQLAlchemy or a direct DB connection
         # to save this data into a 'results' table.
-        # For this example, we will just print it to the console to show it was received.
-        
-        print("--- SAVING RESULTS ---")
-        print(f"Name: {data.get('name')}")
-        print(f"Email: {data.get('email')}")
-        print(f"Phone: {data.get('phone')}")
-        score = data.get('score') / data.get('totalQuestions')
-        print(f"Score: {score}")
-        print("----------------------")
 
         db.results.insert_one({
             "jobId": data.get("jobId"),
             "name":data.get('name'),
             "email":data.get('email'),
             "phone":data.get('phone'),
-            "score": score,
+            "score": data.get('score'),
             "totalQuestions": data.get('totalQuestions')
         })
         
